@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/rass3523/public_html/tim2.rasya-zildan.my.id/
+    - /bin/cp public/index.php $DEPLOYPATH
+    - /bin/cp public/style.css $DEPLOYPATH
