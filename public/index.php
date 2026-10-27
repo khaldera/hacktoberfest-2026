@@ -1,18 +1,40 @@
 <?php
-require __DIR__ . '/../src/env.php';
-function h($s) { return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8'); }
 
-$root = dirname(__DIR__);
+// Lokasi root repository di hosting.
+$root = '/home/rass3523/repositories/hacktoberfest-2026-2';
+
+// Memuat fungsi untuk membaca file .env.
+require_once $root . '/src/env.php';
+
+function h($s)
+{
+    return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+}
+
+// Membaca konfigurasi dari .env di root repository.
 $envPath = $root . '/.env';
 $env = muat_env($envPath);
+
 $tim = $env['TEAM_NAME'] ?? '';
-$anggota = array_filter(array_map('trim', explode(',', $env['TEAM_MEMBERS'] ?? '')));
+$anggota = array_filter(
+    array_map('trim', explode(',', $env['TEAM_MEMBERS'] ?? ''))
+);
 
+// Memeriksa alamat website.
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$lokal = (bool) preg_match('/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i', $host);
-$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-      || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
 
+$lokal = (bool) preg_match(
+    '/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i',
+    $host
+);
+
+// Memeriksa apakah website dibuka melalui HTTPS.
+$https = (
+    !empty($_SERVER['HTTPS']) &&
+    $_SERVER['HTTPS'] !== 'off'
+) || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+
+// Menentukan status deployment.
 if ($lokal) {
     $status = 'lokal';
     $judul = 'Baru terlihat di laptopmu.';
@@ -27,98 +49,178 @@ if ($lokal) {
     $ket = 'Kirim alamat di atas ke temanmu. Kalau mereka bisa membukanya, tahap deploy-mu selesai.';
 }
 
+// Daftar pemeriksaan deployment.
 $cek = [
-    [is_file($envPath), 'File .env terbaca', 'Buat file .env di folder repo, sejajar dengan folder public. Contoh isinya ada di .env.example.'],
-    [$tim !== '', 'Nama tim sudah diisi', 'Isi TEAM_NAME di file .env.'],
-    [!$lokal, 'Alamat bisa dibuka dari luar laptopmu', 'Deploy ke hosting, lalu buka lewat subdomain timmu.'],
-    [$https, 'Dibuka lewat HTTPS', 'Jalankan AutoSSL di cPanel, lalu buka lagi lewat https://.'],
+    [
+        is_file($envPath) && is_readable($envPath),
+        'File .env terbaca',
+        'Pastikan file .env ada di root repository, sejajar dengan folder public. Contoh isinya ada di .env.example.'
+    ],
+    [
+        $tim !== '',
+        'Nama tim sudah diisi',
+        'Isi TEAM_NAME di file .env.'
+    ],
+    [
+        !$lokal,
+        'Alamat bisa dibuka dari luar laptopmu',
+        'Deploy ke hosting, lalu buka lewat subdomain timmu.'
+    ],
+    [
+        $https,
+        'Dibuka lewat HTTPS',
+        'Aktifkan SSL melalui AutoSSL di cPanel, lalu buka kembali menggunakan https://.'
+    ],
 ];
 
-// Daftar tim dari tim/*.md. Hanya URL http(s) yang dijadikan tautan.
+// Membaca daftar tim dari file Markdown di folder tim.
 $galeri = [];
-foreach (array_slice(glob($root . '/tim/*.md') ?: [], 0, 100) as $f) {
+$fileTim = glob($root . '/tim/*.md') ?: [];
+
+foreach (array_slice($fileTim, 0, 100) as $f) {
     $b = basename($f);
-    if ($b === 'README.md' || $b[0] === '_') continue;
+
+    if ($b === 'README.md' || str_starts_with($b, '_')) {
+        continue;
+    }
+
     $d = [];
-    foreach (file($f, FILE_IGNORE_NEW_LINES) as $l) {
-        if (strpos($l, ':') === false) continue;
+
+    $barisFile = file($f, FILE_IGNORE_NEW_LINES);
+
+    if ($barisFile === false) {
+        continue;
+    }
+
+    foreach ($barisFile as $l) {
+        if (strpos($l, ':') === false) {
+            continue;
+        }
+
         [$k, $v] = explode(':', $l, 2);
         $d[strtolower(trim($k))] = trim($v);
     }
+
     $url = $d['url'] ?? '';
-    $aman = preg_match('#^https?://#i', $url) && filter_var($url, FILTER_VALIDATE_URL);
+
+    $aman = preg_match('#^https?://#i', $url)
+        && filter_var($url, FILTER_VALIDATE_URL);
+
     $galeri[] = [
         'nama' => $d['nama'] ?? basename($f, '.md'),
         'anggota' => $d['anggota'] ?? '',
         'url' => $aman ? $url : '',
     ];
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= h($tim !== '' ? $tim : 'Tim tanpa nama') ?> di web terbuka</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title><?= h($tim !== '' ? $tim : 'Tim tanpa nama') ?> di web terbuka</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap"
+        rel="stylesheet"
+    >
+
+    <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 <div class="wrap">
-  <div class="atas">
-    <span>Hacktoberfest 2026 di Polinema, bersama Jagoan Hosting</span>
-    <span><?= h($tim !== '' ? $tim : 'Tim belum diberi nama') ?></span>
-  </div>
 
-  <h1><?= h($judul) ?></h1>
-  <div class="url <?= h($status) ?>">
-    <span class="skema"><?= $https ? 'https://' : 'http://' ?></span><strong><?= h($host) ?></strong>
-  </div>
-  <p class="ket"><?= h($ket) ?></p>
+    <div class="atas">
+        <span>Hacktoberfest 2026 di Polinema, bersama Jagoan Hosting</span>
+        <span><?= h($tim !== '' ? $tim : 'Tim belum diberi nama') ?></span>
+    </div>
 
-  <div class="grid">
-    <section class="cek">
-      <h2>Cek deploy</h2>
-      <ul>
-      <?php foreach ($cek as [$ok, $label, $hint]): ?>
-        <li class="<?= $ok ? 'sudah' : 'belum' ?>">
-          <span class="st"><?= $ok ? 'Sudah' : 'Belum' ?></span>
-          <span><?= h($label) ?></span>
-          <?php if (!$ok): ?><p class="hint"><?= h($hint) ?></p><?php endif; ?>
-        </li>
-      <?php endforeach; ?>
-      </ul>
+    <h1><?= h($judul) ?></h1>
+
+    <div class="url <?= h($status) ?>">
+        <span class="skema"><?= $https ? 'https://' : 'http://' ?></span><strong><?= h($host) ?></strong>
+    </div>
+
+    <p class="ket"><?= h($ket) ?></p>
+
+    <div class="grid">
+
+        <section class="cek">
+            <h2>Cek deploy</h2>
+
+            <ul>
+                <?php foreach ($cek as [$ok, $label, $hint]): ?>
+                    <li class="<?= $ok ? 'sudah' : 'belum' ?>">
+                        <span class="st"><?= $ok ? 'Sudah' : 'Belum' ?></span>
+                        <span><?= h($label) ?></span>
+
+                        <?php if (!$ok): ?>
+                            <p class="hint"><?= h($hint) ?></p>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Tim</h2>
+
+            <dl>
+                <dt>Nama</dt>
+                <dd><?= $tim !== '' ? h($tim) : 'Belum diisi' ?></dd>
+
+                <dt>Anggota</dt>
+                <dd><?= $anggota ? h(implode(', ', $anggota)) : 'Belum diisi' ?></dd>
+
+                <dt>PHP di server</dt>
+                <dd><?= h(PHP_VERSION) ?></dd>
+            </dl>
+        </section>
+
+    </div>
+
+    <section class="daftar">
+        <h2>Tim yang sudah live</h2>
+
+        <?php if ($galeri): ?>
+            <ul class="gal">
+                <?php foreach ($galeri as $g): ?>
+                    <li>
+                        <span>
+                            <b><?= h($g['nama']) ?></b>
+
+                            <?php if ($g['anggota'] !== ''): ?>
+                                <br><small><?= h($g['anggota']) ?></small>
+                            <?php endif; ?>
+                        </span>
+
+                        <?php if ($g['url'] !== ''): ?>
+                            <a
+                                href="<?= h($g['url']) ?>"
+                                rel="noopener nofollow"
+                            ><?= h($g['url']) ?></a>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p>
+                Belum ada tim di daftar ini. Kirim pull request berisi satu
+                file di folder <code>tim/</code> supaya timmu muncul di sini.
+            </p>
+        <?php endif; ?>
     </section>
 
-    <section>
-      <h2>Tim</h2>
-      <dl>
-        <dt>Nama</dt><dd><?= $tim !== '' ? h($tim) : 'Belum diisi' ?></dd>
-        <dt>Anggota</dt><dd><?= $anggota ? h(implode(', ', $anggota)) : 'Belum diisi' ?></dd>
-        <dt>PHP di server</dt><dd><?= h(PHP_VERSION) ?></dd>
-      </dl>
-    </section>
-  </div>
+    <footer>
+        Template workshop Hacktoberfest 2026: From Localhost To Open Web.
+    </footer>
 
-  <section class="daftar">
-    <h2>Tim yang sudah live</h2>
-    <?php if ($galeri): ?>
-    <ul class="gal">
-      <?php foreach ($galeri as $g): ?>
-      <li>
-        <span><b><?= h($g['nama']) ?></b><?= $g['anggota'] !== '' ? '<br><small>' . h($g['anggota']) . '</small>' : '' ?></span>
-        <?php if ($g['url'] !== ''): ?><a href="<?= h($g['url']) ?>" rel="noopener nofollow"><?= h($g['url']) ?></a><?php endif; ?>
-      </li>
-      <?php endforeach; ?>
-    </ul>
-    <?php else: ?>
-    <p>Belum ada tim di daftar ini. Kirim pull request berisi satu file di folder <code>tim/</code> supaya timmu muncul di sini.</p>
-    <?php endif; ?>
-  </section>
-
-  <footer>Template workshop Hacktoberfest 2026: From Localhost To Open Web.</footer>
 </div>
 </body>
 </html>
